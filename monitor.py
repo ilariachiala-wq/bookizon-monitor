@@ -25,7 +25,7 @@ URL = "https://bookizon.it/web/n/sun-bay/modulo-seats/booking-engine?map_id=7"
 NTFY_TOPIC = "Sunbay"
 
 # Quanti mesi in avanti controllare a partire da quello corrente
-MESI_DA_CONTROLLARE = 3
+MESI_DA_CONTROLLARE = 2
 
 # File dove viene salvata la lista delle date disponibili trovate l'ultima volta
 STATO_FILE = Path(__file__).parent / "stato_date_disponibili.json"
@@ -82,7 +82,8 @@ def leggi_date_disponibili() -> set:
         # Apre il popup "Modifica prenotazione" -> calendario.
         # Clicca sul testo/data mostrata, che apre il datepicker Litepicker.
         page.get_by_text("Scegli una data").click()
-        page.wait_for_selector(".litepicker .day-item", timeout=15000)
+        page.wait_for_selector(".litepicker .day-item", state="attached", timeout=15000)
+        page.wait_for_timeout(500)  # piccola pausa per far assestare le animazioni
 
         for mese_indice in range(MESI_DA_CONTROLLARE):
             # Legge l'intestazione mese/anno mostrata, es: "agosto 2026"
@@ -104,7 +105,7 @@ def leggi_date_disponibili() -> set:
             # Passa al mese successivo, se non e' l'ultimo giro
             if mese_indice < MESI_DA_CONTROLLARE - 1:
                 try:
-                    page.locator(".litepicker .button-next").first.click()
+                    page.locator(".litepicker .button-next").first.click(force=True)
                     page.wait_for_timeout(700)
                 except Exception:
                     break
