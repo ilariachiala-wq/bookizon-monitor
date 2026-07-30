@@ -22,7 +22,7 @@ URL = "https://bookizon.it/web/n/sun-bay/modulo-seats/booking-engine?map_id=7"
 
 # Nome "canale" di notifica. Deve essere lo stesso che apri nell'app ntfy sul telefono.
 # Scegline uno univoco (non un nome generico), per evitare che altri lo indovinino.
-NTFY_TOPIC = "sunbay-lidobruno-CAMBIAMI123"
+NTFY_TOPIC = "Sunbay"
 
 # Quanti mesi in avanti controllare a partire da quello corrente
 MESI_DA_CONTROLLARE = 3
