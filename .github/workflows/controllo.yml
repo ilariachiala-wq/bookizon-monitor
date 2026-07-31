@@ -1,10 +1,7 @@
 name: Controllo disponibilita Sun Bay
 
 on:
-  schedule:
-    # Ogni 15 minuti (GitHub puo' avere qualche minuto di ritardo nei picchi di traffico)
-    - cron: "*/15 * * * *"
-  workflow_dispatch: {}   # permette anche di avviarlo manualmente dal sito, per fare un test
+  workflow_dispatch: {}   # avviato da cron-job.org (esterno) e/o manualmente dal sito
 
 permissions:
   contents: write   # serve per poter salvare il file dello stato nel repository
