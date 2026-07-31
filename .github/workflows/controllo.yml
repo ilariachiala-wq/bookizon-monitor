@@ -32,6 +32,14 @@ jobs:
       - name: Esegui il controllo
         run: python monitor.py
 
+      - name: Carica lo screenshot dell'errore (solo se qualcosa e' andato storto)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: errore-screenshot
+          path: errore_screenshot.png
+          retention-days: 7
+
       - name: Salva lo stato aggiornato nel repository
         run: |
           git config user.name "monitor-bot"
