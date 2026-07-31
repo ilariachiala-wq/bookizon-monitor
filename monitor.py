@@ -22,10 +22,10 @@ URL = "https://bookizon.it/web/n/sun-bay/modulo-seats/booking-engine?map_id=7"
 
 # Nome "canale" di notifica. Deve essere lo stesso che apri nell'app ntfy sul telefono.
 # Scegline uno univoco (non un nome generico), per evitare che altri lo indovinino.
-NTFY_TOPIC = "Sunbay"
+NTFY_TOPIC = "sunbay"
 
 # Quanti mesi in avanti controllare a partire da quello corrente
-MESI_DA_CONTROLLARE = 2
+MESI_DA_CONTROLLARE = 1
 
 # File dove viene salvata la lista delle date disponibili trovate l'ultima volta
 STATO_FILE = Path(__file__).parent / "stato_date_disponibili.json"
@@ -85,6 +85,8 @@ def leggi_date_disponibili() -> set:
         page.wait_for_selector(".litepicker .day-item", state="attached", timeout=15000)
         page.wait_for_timeout(500)  # piccola pausa per far assestare le animazioni
 
+        mese_precedente_testo = None
+
         for mese_indice in range(MESI_DA_CONTROLLARE):
             # Legge l'intestazione mese/anno mostrata, es: "agosto 2026"
             try:
@@ -102,12 +104,30 @@ def leggi_date_disponibili() -> set:
                     data_leggibile = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
                     date_disponibili.add(f"{data_leggibile} ({intestazione})")
 
-            # Passa al mese successivo, se non e' l'ultimo giro
+            # Passa al mese successivo, se non e' l'ultimo giro.
+            # Verifichiamo che il mese sia DAVVERO cambiato prima di continuare,
+            # altrimenti rischiamo di leggere due volte lo stesso mese e saltarne
+            # uno (il che ci ha gia' fatto perdere una data disponibile in passato).
             if mese_indice < MESI_DA_CONTROLLARE - 1:
-                try:
-                    page.locator(".litepicker .button-next").first.click(force=True)
-                    page.wait_for_timeout(700)
-                except Exception:
+                mese_precedente_testo = intestazione
+                cambiato = False
+                for tentativo in range(3):
+                    try:
+                        page.locator(".litepicker .button-next").first.click(force=True)
+                        page.wait_for_timeout(900)
+                        nuova_intestazione = page.locator(".litepicker .month-item-header").first.inner_text()
+                        if nuova_intestazione != mese_precedente_testo:
+                            cambiato = True
+                            break
+                    except Exception as e:
+                        print(f"[{datetime.now():%H:%M:%S}] Tentativo {tentativo + 1}: click 'mese successivo' fallito: {e}")
+                        page.wait_for_timeout(1000)
+
+                if not cambiato:
+                    print(
+                        f"[{datetime.now():%H:%M:%S}] ATTENZIONE: non sono riuscito a passare al mese "
+                        f"successivo dopo '{mese_precedente_testo}'. Mesi successivi NON controllati in questo giro."
+                    )
                     break
 
         browser.close()
@@ -119,6 +139,9 @@ def controlla_una_volta() -> None:
     print(f"[{datetime.now():%H:%M:%S}] Controllo in corso...")
     date_attuali = leggi_date_disponibili()
     date_precedenti = carica_stato_precedente()
+
+    if len(date_attuali) == 0:
+        print(f"[{datetime.now():%H:%M:%S}] ATTENZIONE: nessuna data letta in questo giro (possibile problema tecnico).")
 
     nuove_date = date_attuali - date_precedenti
 
