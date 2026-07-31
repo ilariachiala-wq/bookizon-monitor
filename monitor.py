@@ -77,60 +77,73 @@ def leggi_date_disponibili() -> set:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(URL, timeout=60000)
 
-        # Apre il popup "Modifica prenotazione" -> calendario.
-        # Clicca sul testo/data mostrata, che apre il datepicker Litepicker.
-        page.get_by_text("Scegli una data").click()
-        page.wait_for_selector(".litepicker .day-item", state="attached", timeout=15000)
-        page.wait_for_timeout(500)  # piccola pausa per far assestare le animazioni
+        try:
+            page.goto(URL, timeout=60000)
 
-        mese_precedente_testo = None
+            # Apre il popup "Modifica prenotazione" -> calendario.
+            page.get_by_text("Scegli una data").click(timeout=30000)
+            page.wait_for_selector(".litepicker .day-item", state="attached", timeout=15000)
+            page.wait_for_timeout(500)  # piccola pausa per far assestare le animazioni
 
-        for mese_indice in range(MESI_DA_CONTROLLARE):
-            # Legge l'intestazione mese/anno mostrata, es: "agosto 2026"
+            mese_precedente_testo = None
+
+            for mese_indice in range(MESI_DA_CONTROLLARE):
+                # Legge l'intestazione mese/anno mostrata, es: "agosto 2026"
+                try:
+                    intestazione = page.locator(".litepicker .month-item-header").first.inner_text()
+                except Exception:
+                    intestazione = f"mese #{mese_indice + 1}"
+
+                giorni = page.locator(".litepicker .day-item").all()
+                for giorno in giorni:
+                    classe = giorno.get_attribute("class") or ""
+                    data_time = giorno.get_attribute("data-time")
+                    if "is-locked" not in classe and data_time:
+                        # data-time e' un timestamp in millisecondi
+                        ts = int(data_time) / 1000
+                        data_leggibile = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
+                        date_disponibili.add(f"{data_leggibile} ({intestazione})")
+
+                # Passa al mese successivo, se non e' l'ultimo giro.
+                # Verifichiamo che il mese sia DAVVERO cambiato prima di continuare,
+                # altrimenti rischiamo di leggere due volte lo stesso mese e saltarne
+                # uno (il che ci ha gia' fatto perdere una data disponibile in passato).
+                if mese_indice < MESI_DA_CONTROLLARE - 1:
+                    mese_precedente_testo = intestazione
+                    cambiato = False
+                    for tentativo in range(3):
+                        try:
+                            page.locator(".litepicker .button-next").first.click(force=True)
+                            page.wait_for_timeout(900)
+                            nuova_intestazione = page.locator(".litepicker .month-item-header").first.inner_text()
+                            if nuova_intestazione != mese_precedente_testo:
+                                cambiato = True
+                                break
+                        except Exception as e:
+                            print(f"[{datetime.now():%H:%M:%S}] Tentativo {tentativo + 1}: click 'mese successivo' fallito: {e}")
+                            page.wait_for_timeout(1000)
+
+                    if not cambiato:
+                        print(
+                            f"[{datetime.now():%H:%M:%S}] ATTENZIONE: non sono riuscito a passare al mese "
+                            f"successivo dopo '{mese_precedente_testo}'. Mesi successivi NON controllati in questo giro."
+                        )
+                        break
+
+        except Exception:
+            # Se qualcosa va storto, salviamo uno screenshot della pagina
+            # cosi' possiamo vedere cosa stava mostrando il sito in quel momento
             try:
-                intestazione = page.locator(".litepicker .month-item-header").first.inner_text()
-            except Exception:
-                intestazione = f"mese #{mese_indice + 1}"
+                screenshot_path = Path(__file__).parent / "errore_screenshot.png"
+                page.screenshot(path=str(screenshot_path))
+                print(f"[{datetime.now():%H:%M:%S}] Screenshot dell'errore salvato in {screenshot_path}")
+            except Exception as e2:
+                print(f"[{datetime.now():%H:%M:%S}] Non sono riuscito a salvare lo screenshot: {e2}")
+            raise
 
-            giorni = page.locator(".litepicker .day-item").all()
-            for giorno in giorni:
-                classe = giorno.get_attribute("class") or ""
-                data_time = giorno.get_attribute("data-time")
-                if "is-locked" not in classe and data_time:
-                    # data-time e' un timestamp in millisecondi
-                    ts = int(data_time) / 1000
-                    data_leggibile = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
-                    date_disponibili.add(f"{data_leggibile} ({intestazione})")
-
-            # Passa al mese successivo, se non e' l'ultimo giro.
-            # Verifichiamo che il mese sia DAVVERO cambiato prima di continuare,
-            # altrimenti rischiamo di leggere due volte lo stesso mese e saltarne
-            # uno (il che ci ha gia' fatto perdere una data disponibile in passato).
-            if mese_indice < MESI_DA_CONTROLLARE - 1:
-                mese_precedente_testo = intestazione
-                cambiato = False
-                for tentativo in range(3):
-                    try:
-                        page.locator(".litepicker .button-next").first.click(force=True)
-                        page.wait_for_timeout(900)
-                        nuova_intestazione = page.locator(".litepicker .month-item-header").first.inner_text()
-                        if nuova_intestazione != mese_precedente_testo:
-                            cambiato = True
-                            break
-                    except Exception as e:
-                        print(f"[{datetime.now():%H:%M:%S}] Tentativo {tentativo + 1}: click 'mese successivo' fallito: {e}")
-                        page.wait_for_timeout(1000)
-
-                if not cambiato:
-                    print(
-                        f"[{datetime.now():%H:%M:%S}] ATTENZIONE: non sono riuscito a passare al mese "
-                        f"successivo dopo '{mese_precedente_testo}'. Mesi successivi NON controllati in questo giro."
-                    )
-                    break
-
-        browser.close()
+        finally:
+            browser.close()
 
     return date_disponibili
 
