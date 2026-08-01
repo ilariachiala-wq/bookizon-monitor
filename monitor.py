@@ -22,10 +22,10 @@ URL = "https://bookizon.it/web/n/sun-bay/modulo-seats/booking-engine?map_id=7"
 
 # Nome "canale" di notifica. Deve essere lo stesso che apri nell'app ntfy sul telefono.
 # Scegline uno univoco (non un nome generico), per evitare che altri lo indovinino.
-NTFY_TOPIC = "sunbay"
+NTFY_TOPIC = "Sunbay"
 
 # Quanti mesi in avanti controllare a partire da quello corrente
-MESI_DA_CONTROLLARE = 1
+MESI_DA_CONTROLLARE = 2
 
 # File dove viene salvata la lista delle date disponibili trovate l'ultima volta
 STATO_FILE = Path(__file__).parent / "stato_date_disponibili.json"
@@ -80,6 +80,19 @@ def leggi_date_disponibili() -> set:
 
         try:
             page.goto(URL, timeout=60000)
+
+            # Il banner dei cookie compare ad ogni esecuzione (browser sempre "pulito"),
+            # e puo' bloccare il click su "Scegli una data" se rimane visibile sopra.
+            # Proviamo a chiuderlo, ma senza bloccarci se non c'e' o ha un nome diverso.
+            try:
+                page.locator(
+                    "#iubenda-cs-accept-btn, .iubenda-cs-accept-btn, "
+                    "button:has-text('Accetta'), button:has-text('Accetto'), "
+                    "button:has-text('OK')"
+                ).first.click(timeout=5000)
+                page.wait_for_timeout(500)
+            except Exception:
+                pass  # nessun banner trovato, o gia' chiuso: va bene cosi'
 
             # Apre il popup "Modifica prenotazione" -> calendario.
             page.get_by_text("Scegli una data").click(timeout=30000)
@@ -150,7 +163,23 @@ def leggi_date_disponibili() -> set:
 
 def controlla_una_volta() -> None:
     print(f"[{datetime.now():%H:%M:%S}] Controllo in corso...")
-    date_attuali = leggi_date_disponibili()
+
+    date_attuali = None
+    ultimo_errore = None
+    for tentativo in range(2):
+        try:
+            date_attuali = leggi_date_disponibili()
+            break
+        except Exception as e:
+            ultimo_errore = e
+            print(f"[{datetime.now():%H:%M:%S}] Tentativo {tentativo + 1}/2 fallito: {e}")
+            if tentativo == 0:
+                print(f"[{datetime.now():%H:%M:%S}] Riprovo subito una seconda volta...")
+
+    if date_attuali is None:
+        print(f"[{datetime.now():%H:%M:%S}] Entrambi i tentativi falliti. Interrompo questo giro.")
+        raise ultimo_errore
+
     date_precedenti = carica_stato_precedente()
 
     if len(date_attuali) == 0:
