@@ -3,13 +3,14 @@ name: Controllo disponibilita Sun Bay
 on:
   workflow_dispatch: {}   # avviato da cron-job.org (esterno) e/o manualmente dal sito
 
-# Se parte una nuova esecuzione mentre una precedente e' ancora in corso,
-# cancelliamo quella vecchia e facciamo partire subito la piu' recente.
-# (Ogni controllo e' indipendente: non serve completare quelli "vecchi" in coda,
-# meglio avere sempre il dato piu' fresco possibile)
+# Se un controllo e' gia' in corso quando arriva un nuovo trigger, lo lasciamo
+# FINIRE (potrebbe essere proprio quello a rilevare un'apertura, non ha senso
+# interromperlo sul piu' bello). I trigger che arrivano nel frattempo si mettono
+# in coda, ma GitHub tiene automaticamente solo l'ultimo arrivato: non si
+# accumula comunque un arretrato di controlli "vecchi".
 concurrency:
   group: controllo-sun-bay
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write   # serve per poter salvare il file dello stato nel repository
