@@ -25,11 +25,25 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
-      - name: Installa le librerie
-        run: |
-          pip install playwright
-          playwright install --with-deps chromium
+      - name: Ripristina la cache del browser Playwright (se presente)
+        uses: actions/cache@v4
+        id: cache-playwright
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-v1
+
+      - name: Installa le librerie Python
+        run: pip install playwright
+
+      - name: Installa il browser Chromium (solo se non gia' in cache)
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: playwright install --with-deps chromium
+
+      - name: Installa solo le dipendenze di sistema (se il browser era gia' in cache)
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
 
       - name: Esegui il controllo
         run: python monitor.py
