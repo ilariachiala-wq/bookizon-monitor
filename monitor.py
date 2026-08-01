@@ -25,7 +25,7 @@ URL = "https://bookizon.it/web/n/sun-bay/modulo-seats/booking-engine?map_id=7"
 NTFY_TOPIC = "Sunbay"
 
 # Quanti mesi in avanti controllare a partire da quello corrente
-MESI_DA_CONTROLLARE = 2
+MESI_DA_CONTROLLARE = 3
 
 # File dove viene salvata la lista delle date disponibili trovate l'ultima volta
 STATO_FILE = Path(__file__).parent / "stato_date_disponibili.json"
@@ -35,14 +35,14 @@ STATO_FILE = Path(__file__).parent / "stato_date_disponibili.json"
 # FUNZIONI
 # =========================
 
-def invia_notifica(messaggio: str) -> None:
+def invia_notifica(messaggio: str, titolo: str = "Nuova data disponibile - Sun Bay", tags: str = "beach_umbrella") -> None:
     """Invia una notifica push tramite ntfy.sh (gratuito, nessun account richiesto)."""
     url = f"https://ntfy.sh/{NTFY_TOPIC}"
     data = messaggio.encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Title", "Nuova data disponibile - Sun Bay")
+    req.add_header("Title", titolo)
     req.add_header("Priority", "high")
-    req.add_header("Tags", "beach_umbrella")
+    req.add_header("Tags", tags)
     try:
         urllib.request.urlopen(req, timeout=15)
         print(f"[{datetime.now():%H:%M:%S}] Notifica inviata: {messaggio}")
@@ -161,6 +161,14 @@ def leggi_date_disponibili() -> set:
     return date_disponibili
 
 
+def _estrai_data(voce: str) -> "datetime.date | None":
+    """Estrae la data (YYYY-MM-DD) dall'inizio di una voce tipo '2026-08-01 (agosto2026)'."""
+    try:
+        return datetime.strptime(voce.split(" ")[0], "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
 def controlla_una_volta() -> None:
     print(f"[{datetime.now():%H:%M:%S}] Controllo in corso...")
 
@@ -187,11 +195,28 @@ def controlla_una_volta() -> None:
 
     nuove_date = date_attuali - date_precedenti
 
+    # Date che c'erano prima e ora non ci sono piu'. Escludiamo pero' quelle
+    # ormai nel passato: se "ieri" sparisce dal calendario e' normale (il tempo
+    # e' passato), non vuol dire che qualcuno l'abbia richiusa attivamente.
+    oggi = datetime.utcnow().date()
+    date_sparite = date_precedenti - date_attuali
+    date_richiuse = set()
+    for voce in date_sparite:
+        data = _estrai_data(voce)
+        if data is None or data >= oggi:
+            date_richiuse.add(voce)
+
     if nuove_date:
         elenco = "\n".join(sorted(nuove_date))
         print(f"[{datetime.now():%H:%M:%S}] Trovate nuove date: {elenco}")
         invia_notifica(f"Nuove date aperte alla prenotazione:\n{elenco}")
-    else:
+
+    if date_richiuse:
+        elenco = "\n".join(sorted(date_richiuse))
+        print(f"[{datetime.now():%H:%M:%S}] Date richiuse: {elenco}")
+        invia_notifica(f"Date NON piu' disponibili:\n{elenco}", titolo="Date richiuse - Sun Bay", tags="no_entry_sign")
+
+    if not nuove_date and not date_richiuse:
         print(f"[{datetime.now():%H:%M:%S}] Nessuna novita'. Date disponibili attuali: {len(date_attuali)}")
 
     salva_stato(date_attuali)
