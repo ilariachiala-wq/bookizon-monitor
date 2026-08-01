@@ -25,7 +25,7 @@ URL = "https://bookizon.it/web/n/sun-bay/modulo-seats/booking-engine?map_id=7"
 NTFY_TOPIC = "Sunbay"
 
 # Quanti mesi in avanti controllare a partire da quello corrente
-MESI_DA_CONTROLLARE = 3
+MESI_DA_CONTROLLARE = 1
 
 # File dove viene salvata la lista delle date disponibili trovate l'ultima volta
 STATO_FILE = Path(__file__).parent / "stato_date_disponibili.json"
