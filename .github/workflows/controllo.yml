@@ -3,11 +3,13 @@ name: Controllo disponibilita Sun Bay
 on:
   workflow_dispatch: {}   # avviato da cron-job.org (esterno) e/o manualmente dal sito
 
-# Se un'esecuzione e' gia' in corso, le altre aspettano il loro turno invece
-# di partire in parallelo (evita il conflitto di salvataggio su Git visto in pratica)
+# Se parte una nuova esecuzione mentre una precedente e' ancora in corso,
+# cancelliamo quella vecchia e facciamo partire subito la piu' recente.
+# (Ogni controllo e' indipendente: non serve completare quelli "vecchi" in coda,
+# meglio avere sempre il dato piu' fresco possibile)
 concurrency:
   group: controllo-sun-bay
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write   # serve per poter salvare il file dello stato nel repository
