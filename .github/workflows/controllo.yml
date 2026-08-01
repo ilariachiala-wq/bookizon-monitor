@@ -35,7 +35,7 @@ jobs:
           key: playwright-chromium-${{ runner.os }}-v1
 
       - name: Installa le librerie Python
-        run: pip install playwright
+        run: pip install -r requirements.txt
 
       - name: Installa il browser Chromium (solo se non gia' in cache)
         if: steps.cache-playwright.outputs.cache-hit != 'true'
