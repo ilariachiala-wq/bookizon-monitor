@@ -78,6 +78,16 @@ def leggi_date_disponibili() -> set:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
+        # Blocchiamo immagini, font, fogli di stile e media: non ci servono
+        # (leggiamo solo attributi HTML nascosti), e saltarli velocizza parecchio
+        # il caricamento della pagina.
+        page.route(
+            "**/*",
+            lambda route: route.abort()
+            if route.request.resource_type in ("image", "font", "media", "stylesheet")
+            else route.continue_(),
+        )
+
         try:
             page.goto(URL, timeout=60000)
 
@@ -89,8 +99,8 @@ def leggi_date_disponibili() -> set:
                     "#iubenda-cs-accept-btn, .iubenda-cs-accept-btn, "
                     "button:has-text('Accetta'), button:has-text('Accetto'), "
                     "button:has-text('OK')"
-                ).first.click(timeout=5000)
-                page.wait_for_timeout(500)
+                ).first.click(timeout=2000)
+                page.wait_for_timeout(300)
             except Exception:
                 pass  # nessun banner trovato, o gia' chiuso: va bene cosi'
 
